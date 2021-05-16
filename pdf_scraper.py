@@ -22,12 +22,13 @@ I have gathered at work and which have now become too many to sort them by
 hand.
 """
 
-import os
-import PyPDF2
-import sys
-
 from collections import Counter
 from string import ascii_letters, whitespace # digits, punctuation
+
+import os
+import sys
+
+import PyPDF2
 
 
 KEYWORD_NUMBER = 20
@@ -48,7 +49,7 @@ def get_pdf_filenames(directory):
     """
     pdf_files = list()
 
-    for (dirpath, dirnames, filenames) in os.walk(directory):
+    for (dirpath, _, filenames) in os.walk(directory):
         filenames = [f for f in filenames if f.endswith(".pdf")]
         pdf_files.extend(make_full_path(dirpath, filenames))
 
@@ -60,12 +61,11 @@ def get_text_from_pdf(filepath):
     """
     text = ""
 
-    with open(filepath, "rb") as pdfFileObj:
-        pdfReader = PyPDF2.PdfFileReader(pdfFileObj)
-        for page in range(pdfReader.numPages):
-            pageObj = pdfReader.getPage(page)
-            tmp_txt = pageObj.extractText()
-            text = " ".join([text, tmp_txt])
+    with open(filepath, "rb") as pdf_file_obj:
+        pdf_reader = PyPDF2.PdfFileReader(pdf_file_obj)
+        for page in range(pdf_reader.numPages):
+            page_obj = pdf_reader.getPage(page)
+            text = " ".join([text, page_obj.extractText()])
 
     remove_chars = set(list(text)).difference(ALLOWED_CHARS)
     for char in remove_chars:
@@ -122,15 +122,19 @@ def main():
     pdf_files = get_pdf_filenames(directory)
     print(f"\n\nFound {len(pdf_files)} pdf files for further processing.")
 
-    for index in range(len(pdf_files)):
-        text = get_text_from_pdf(pdf_files[index])
-        if len(text) == 0:
-            print(f"\nCould not read text from file {pdf_files[index]}.\n")
+    for filepath in pdf_files:
+        text = get_text_from_pdf(filepath)
+        result = find_keywords(text)
+
+        if not result:
+            print(f"\nCould not read text from file {filepath}.")
             continue
-        keyword_summary[pdf_files[index]] = find_keywords(text)
+
+        keyword_summary[filepath] = result
 
     print_keyword_table(keyword_summary)
 
 
 if __name__ == "__main__":
     main()
+
