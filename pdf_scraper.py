@@ -27,55 +27,109 @@ import PyPDF2
 import sys
 
 from collections import Counter
-from string import ascii_letters, digits, punctuation
+from string import ascii_letters, whitespace # digits, punctuation
 
 
-STOP_WORDS_ENGLISH = "./stop_words/stop_words_english.txt"
-STOP_WORDS_GERMAN  = "./stop_words/stop_words_german.txt"
+KEYWORD_NUMBER = 20
+ALLOWED_CHARS = set(ascii_letters).union(set(whitespace))
+
+STOP_WORDS = "./stop_words/stop_words_english.txt"
+# STOP_WORDS = "./stop_words/stop_words_german.txt"
+
+
+def make_full_path(root, extensions):
+    """ TO DO: write docstring
+    """
+    return [os.path.join(root, ext) for ext in extensions]
 
 
 def get_pdf_filenames(directory):
     """ TO DO: write docstring
     """
-    files = list()
-    dirlist = [directory]
+    pdf_files = list()
 
-    while len(dirlist) > 0:
-        for (dirpath, dirnames, filenames) in os.walk(dirlist.pop()):
-            dirlist.extend(dirnames)
-            files.extend(map(lambda n: os.path.join(*n), zip([dirpath] *
-                len(filenames), filenames)))
-
-    pdf_files = [file for file in files if file.endswith(".pdf")]
-
-    print("Found the following pdf files:\n")
-    for file in pdf_files:
-        print(f"\t{file}")
+    for (dirpath, dirnames, filenames) in os.walk(directory):
+        filenames = [f for f in filenames if f.endswith(".pdf")]
+        pdf_files.extend(make_full_path(dirpath, filenames))
 
     return pdf_files
 
 
-def get_keywords(text):
+def get_text_from_pdf(filepath):
     """ TO DO: write docstring
     """
-    return keywords
+    text = ""
+
+    with open(filepath, "rb") as pdfFileObj:
+        pdfReader = PyPDF2.PdfFileReader(pdfFileObj)
+        for page in range(pdfReader.numPages):
+            pageObj = pdfReader.getPage(page)
+            tmp_txt = pageObj.extractText()
+            text = " ".join([text, tmp_txt])
+
+    remove_chars = set(list(text)).difference(ALLOWED_CHARS)
+    for char in remove_chars:
+        text = text.replace(char, " ")
+
+    return text
 
 
-def write_keyword_table():
+def remove_stop_words(word_list):
     """ TO DO: write docstring
     """
-    pass
+    with open(STOP_WORDS, "r") as f_in:
+        stop_words = f_in.read().split("\n")
+
+    word_list = [word for word in word_list if word not in stop_words]
+
+    return word_list
 
 
-# Program starts here
+def find_keywords(text):
+    """ TO DO: write docstring
+    """
+    word_list = [word.lower() for word in text.split()]
+
+    word_list = remove_stop_words(word_list)
+    text_count = Counter(word_list)
+
+    return text_count.most_common(KEYWORD_NUMBER)
+
+
+def print_keyword_table(summary):
+    """ TO DO: write docstring
+    """
+    print(f"\nSummary for {len(summary)} analyzed files:")
+    for filename in summary.keys():
+        print(f"\n...{filename[-45:]}:")
+        print([word for (word, _) in summary[filename]])
+    print()
+
+    return None
+
+
 def main():
+    """ TO DO: write docstring
+    """
     if len(sys.argv) == 2:
         directory = sys.argv[1]
-        get_pdf_filenames(directory)
     else:
         print("\nUSAGE: pdf_scraper <path>")
+        sys.exit()
 
-    sys.exit()
+    keyword_summary = dict()
+
+    pdf_files = get_pdf_filenames(directory)
+    print(f"\n\nFound {len(pdf_files)} pdf files for further processing.")
+
+    for index in range(len(pdf_files)):
+        text = get_text_from_pdf(pdf_files[index])
+        if len(text) == 0:
+            print(f"\nCould not read text from file {pdf_files[index]}.\n")
+            continue
+        keyword_summary[pdf_files[index]] = find_keywords(text)
+
+    print_keyword_table(keyword_summary)
 
 
 if __name__ == "__main__":
